@@ -96,12 +96,20 @@ int main() {
 
 // limparBufferEntrada():
 // Função utilitária para limpar o buffer de entrada do teclado (stdin), evitando problemas com leituras consecutivas de scanf e getchar.
+// Libera memória 
+
 // ============================================================================
-//                      PROJETO WAR ESTRUTURADO - NÍVEL NOVATO
+//                      PROJETO WAR ESTRUTURADO - NÍVEL AVENTUREIRO
 // ============================================================================
-// Este código organiza um pequeno sistema baseado no jogo War,
-// incluindo alocação dinâmica de territórios, exibição, missão
-// sorteada e menu básico.
+// Neste módulo avançamos a implementação do WAR, incluindo:
+// - Alocação dinâmica do mapa de territórios
+// - Função de ataque modularizada
+// - Simulação de dados com rand()
+// - Atualização de cor e tropas após batalha
+// - Validações de ataque
+// - Liberação correta da memória
+//
+// Este é um passo importante na simulação real do jogo.
 // ============================================================================
 
 #include <stdio.h>
@@ -109,230 +117,181 @@ int main() {
 #include <string.h>
 #include <time.h>
 
-#define MAX_TERRITORIOS 5
-#define TAM_NOME 50
-#define NUM_MISSOES 2
-
 // ============================================================================
-// ESTRUTURA DE DADOS PRINCIPAL
-// Representa um território: nome, cor (dono) e tropas.
+// ESTRUTURA PRINCIPAL DO PROJETO
+// Representa um território do jogo.
 // ============================================================================
 typedef struct {
-    char nome[TAM_NOME];
-    char cor[20];
+    char nome[30];
+    char cor[10];
     int tropas;
 } Territorio;
 
 // ============================================================================
 // PROTÓTIPOS DAS FUNÇÕES
 // ============================================================================
+Territorio* criarMapaDinamico(int qtd);
+void inicializarTerritorios(Territorio* mapa, int qtd);
+void exibirMapa(const Territorio* mapa, int qtd);
 
-// Setup e memória
-Territorio* alocarMapa(int qtd);
-void inicializarTerritorios(Territorio *mapa, int qtd);
-void liberarMemoria(Territorio *mapa);
+void atacar(Territorio* atacante, Territorio* defensor);
 
-// Interface
-void exibirMenuPrincipal();
-void exibirMapa(const Territorio *mapa, int qtd);
-void exibirMissao(int idMissao);
-
-// Lógica principal
-void faseDeAtaque(Territorio *mapa, int qtd);
-void simularAtaque(Territorio *origem, Territorio *destino);
-int sortearMissao();
-int verificarVitoria(const Territorio *mapa, int qtd, int idMissao);
-
-// Utilidades
-void limparBufferEntrada();
+void liberarMemoria(Territorio* mapa);
 
 // ============================================================================
 // FUNÇÃO PRINCIPAL
 // ============================================================================
 int main() {
-    srand(time(NULL));
 
-    // 1) Allocação dinâmica do mapa
-    Territorio *mapa = alocarMapa(MAX_TERRITORIOS);
+    srand(time(NULL)); // Algoritmo de aleatoriedade
+
+    int qtd;
+    printf("Digite o número total de territórios que deseja criar: ");
+    scanf("%d", &qtd);
+
+    // Aloca mapa dinamicamente (calloc zera a memória)
+    Territorio* mapa = criarMapaDinamico(qtd);
     if (!mapa) {
         printf("Erro ao alocar memória!\n");
         return 1;
     }
 
-    // 2) Inicializa dados do mapa
-    inicializarTerritorios(mapa, MAX_TERRITORIOS);
+    inicializarTerritorios(mapa, qtd);
 
-    // 3) Sorteia missão secreta
-    int missao = sortearMissao();
+    // LOOP PRINCIPAL
+    int escolhaAtk, escolhaDef;
 
-    // 4) Laço principal do jogo
-    int opcao;
-    do {
-        printf("\n====================================\n");
-        exibirMapa(mapa, MAX_TERRITORIOS);
-        exibirMissao(missao);
-        exibirMenuPrincipal();
-        printf("Escolha: ");
-        scanf("%d", &opcao);
-        limparBufferEntrada();
+    while (1) {
+        printf("\n==================== MAPA ATUAL ====================\n");
+        exibirMapa(mapa, qtd);
 
-        switch (opcao) {
-            case 1:
-                faseDeAtaque(mapa, MAX_TERRITORIOS);
-                break;
+        printf("\nDigite o número do território atacante (-1 para sair): ");
+        scanf("%d", &escolhaAtk);
 
-            case 2:
-                if (verificarVitoria(mapa, MAX_TERRITORIOS, missao))
-                    printf("\n🎉 Você CUMPRIU sua missão!\n");
-                else
-                    printf("\nAinda não cumpriu a missão.\n");
-                break;
+        if (escolhaAtk == -1) break;
 
-            case 0:
-                printf("Saindo do jogo...\n");
-                break;
+        printf("Agora digite o número do território defensor: ");
+        scanf("%d", &escolhaDef);
 
-            default:
-                printf("Opção inválida!\n");
+        // Validação de faixa
+        if (escolhaAtk < 0 || escolhaAtk >= qtd ||
+            escolhaDef < 0 || escolhaDef >= qtd) {
+            printf("Índices inválidos!\n");
+            continue;
         }
-    } while (opcao != 0);
 
-    // 5) Libera memória
+        Territorio* atacante = &mapa[escolhaAtk];
+        Territorio* defensor  = &mapa[escolhaDef];
+
+        // Validação: não atacar território da mesma cor
+        if (strcmp(atacante->cor, defensor->cor) == 0) {
+            printf("\n❌ Não é possível atacar territórios da mesma cor!\n");
+            continue;
+        }
+
+        // Chamada da função de ataque
+        atacar(atacante, defensor);
+    }
+
     liberarMemoria(mapa);
-
     return 0;
 }
 
 // ============================================================================
-// IMPLEMENTAÇÃO DAS FUNÇÕES
+// FUNÇÃO: criarMapaDinamico
+// Retorna um vetor alocado dinamicamente de Territórios usando calloc.
 // ============================================================================
-
-// Aloca o vetor de territórios
-Territorio* alocarMapa(int qtd) {
+Territorio* criarMapaDinamico(int qtd) {
     return (Territorio*) calloc(qtd, sizeof(Territorio));
 }
 
-// Inicializa os territórios com valores básicos
-void inicializarTerritorios(Territorio *mapa, int qtd) {
+// ============================================================================
+// FUNÇÃO: inicializarTerritorios
+// Preenche dados iniciais das estruturas para teste.
+// ============================================================================
+void inicializarTerritorios(Territorio* mapa, int qtd) {
     for (int i = 0; i < qtd; i++) {
-        snprintf(mapa[i].nome, TAM_NOME, "Território %d", i + 1);
-        strcpy(mapa[i].cor, "Azul");
-        mapa[i].tropas = 3;
+        snprintf(mapa[i].nome, sizeof(mapa[i].nome), "Territorio_%d", i);
+        
+        // Alternando cores para testes de ataque
+        if (i % 2 == 0)
+            strcpy(mapa[i].cor, "Azul");
+        else
+            strcpy(mapa[i].cor, "Vermelho");
+
+        mapa[i].tropas = rand() % 5 + 2; // Entre 2 e 6 tropas
     }
 }
 
-// Libera memória
-void liberarMemoria(Territorio *mapa) {
-    free(mapa);
-}
-
-// Exibe menu principal
-void exibirMenuPrincipal() {
-    printf("\n--- MENU ---\n");
-    printf("1 - Atacar\n");
-    printf("2 - Verificar missão\n");
-    printf("0 - Sair\n");
-}
-
-// Exibe tabela de territórios
-void exibirMapa(const Territorio *mapa, int qtd) {
-    printf("\n--- MAPA ATUAL ---\n");
+// ============================================================================
+// FUNÇÃO: exibirMapa
+// Utiliza const para garantir leitura sem modificar dados.
+// ============================================================================
+void exibirMapa(const Territorio* mapa, int qtd) {
     for (int i = 0; i < qtd; i++) {
-        printf("%d) %-15s | Dono: %-6s | Tropas: %d\n",
-               i + 1,
+        printf("%2d - %-15s | Cor: %-8s | Tropas: %d\n",
+               i,
                mapa[i].nome,
                mapa[i].cor,
                mapa[i].tropas);
     }
 }
 
-// Exibe a missão sorteada
-void exibirMissao(int idMissao) {
-    printf("\n--- SUA MISSÃO ---\n");
-    switch (idMissao) {
-        case 0:
-            printf("Conquistar 1 território.\n");
-            break;
-        case 1:
-            printf("Manter todos os seus territórios com pelo menos 3 tropas.\n");
-            break;
-    }
-}
+// ============================================================================
+// FUNÇÃO: atacar
+// Simula um ataque entre dois territórios usando dados (1 a 6).
+//
+// REGRAS DO DESAFIO:
+// - Se atacante vence: defensor perde, sua cor muda e recebe metade das tropas.
+// - Se defensor vence: atacante perde 1 tropa.
+// ============================================================================
+void atacar(Territorio* atacante, Territorio* defensor) {
 
-// Interface da fase de ataque
-void faseDeAtaque(Territorio *mapa, int qtd) {
-    int o, d;
+    printf("\n===== FASE DE ATAQUE =====\n");
+    printf("Atacante: %s (%s) Tropas: %d\n",
+           atacante->nome, atacante->cor, atacante->tropas);
+    printf("Defensor: %s (%s) Tropas: %d\n",
+           defensor->nome, defensor->cor, defensor->tropas);
 
-    printf("\nDigite número do território de origem: ");
-    scanf("%d", &o);
-    printf("Digite número do território de destino: ");
-    scanf("%d", &d);
-    limparBufferEntrada();
-
-    o--; d--;
-
-    if (o < 0 || o >= qtd || d < 0 || d >= qtd) {
-        printf("Índices inválidos!\n");
-        return;
-    }
-
-    simularAtaque(&mapa[o], &mapa[d]);
-}
-
-// Lógica simplificada de batalha
-void simularAtaque(Territorio *origem, Territorio *destino) {
-    if (origem->tropas < 2) {
-        printf("Não há tropas suficientes para atacar!\n");
-        return;
-    }
-
+    // Dado de ataque e defesa (1 a 6)
     int dadoAtk = rand() % 6 + 1;
     int dadoDef = rand() % 6 + 1;
 
-    printf("\nAtaque lançou: %d | Defesa lançou: %d\n", dadoAtk, dadoDef);
+    printf("\nDado de ataque: %d\n", dadoAtk);
+    printf("Dado de defesa: %d\n", dadoDef);
 
     if (dadoAtk > dadoDef) {
-        printf("Vitória no ataque! Destino perde 1 tropa.\n");
-        destino->tropas--;
+        printf("\n🎉 O atacante venceu a batalha!\n");
 
-        if (destino->tropas <= 0) {
-            printf("🎉 Território CONQUISTADO!\n");
-            strcpy(destino->cor, origem->cor);
-            destino->tropas = 1;
-            origem->tropas--;
-        }
+        // Atualização das tropas do defensor
+        int tropasTransferidas = atacante->tropas / 2;
+        if (tropasTransferidas < 1) tropasTransferidas = 1;
+
+        defensor->tropas = tropasTransferidas;
+
+        // Atualização da cor do defensor
+        strcpy(defensor->cor, atacante->cor);
+
+        printf("O território %s foi conquistado!\n", defensor->nome);
+        printf("Novas tropas do defensor: %d\n", defensor->tropas);
+
     } else {
-        printf("Defesa venceu! Origem perde 1 tropa.\n");
-        origem->tropas--;
+        printf("\n❌ O defensor venceu!\n");
+        atacante->tropas--;
+
+        if (atacante->tropas < 0)
+            atacante->tropas = 0;
+
+        printf("O atacante perdeu 1 tropa. Tropas restantes: %d\n",
+               atacante->tropas);
     }
 }
 
-// Sorteia missão
-int sortearMissao() {
-    return rand() % NUM_MISSOES;
-}
-
-// Verifica se o jogador venceu
-int verificarVitoria(const Territorio *mapa, int qtd, int idMissao) {
-    switch (idMissao) {
-
-        case 0: // Conquistar 1 território
-            for (int i = 0; i < qtd; i++)
-                if (strcmp(mapa[i].cor, "Azul") == 0 && mapa[i].tropas > 3)
-                    return 1;
-            return 0;
-
-        case 1: // Todos com >= 3 tropas
-            for (int i = 0; i < qtd; i++)
-                if (mapa[i].tropas < 3)
-                    return 0;
-            return 1;
-    }
-    return 0;
-}
-
-// Limpa buffer do teclado
-void limparBufferEntrada() {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF) {}
+// ============================================================================
+// FUNÇÃO: liberarMemoria
+// Libera o vetor alocado dinamicamente.
+// ============================================================================
+void liberarMemoria(Territorio* mapa) {
+    free(mapa);
+    printf("\nMemória liberada com sucesso.\n");
 }
